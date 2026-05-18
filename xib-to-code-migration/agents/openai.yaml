@@ -1,4 +1,4 @@
 interface:
-  display_name: "XIB to Code Migration"
-  short_description: "Migrate xib/nib UI to pure code safely"
-  default_prompt: "Use $xib-to-code-migration to convert this xib-backed UI to pure code and remove the xib safely."
+  display_name: "XIB-to-Code Migration"
+  short_description: "将 xib/nib 界面安全迁移为纯代码，并清理工程引用"
+  default_prompt: "使用 $xib-to-code-migration 将这个 xib/nib 界面迁移为纯代码，并清理相关 nib 加载和 Xcode 工程引用。"

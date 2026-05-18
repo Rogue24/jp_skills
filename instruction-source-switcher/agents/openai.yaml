@@ -1,0 +1,6 @@
+interface:
+  display_name: "Instruction Source Switcher"
+  short_description: "切换并记住当前环境的指令文件来源，持续应用后续任务"
+  default_prompt: "使用 $instruction-source-switcher 切换当前环境使用的 AGENTS.md 和相关指令文件来源。"
+policy:
+  allow_implicit_invocation: true

@@ -1,9 +1,9 @@
 ---
 name: xib-to-code-migration
-description: Convert iOS/macOS xib or nib-backed UI to pure code and remove Interface Builder dependencies. Use when the user asks to migrate or delete xib/nib files, replace loadNibNamed/UINib/nibWithNibName/registerNib usage, convert UIKit/AppKit views/controllers/cells to code, or clean Xcode project references after xib removal.
+description: 将 iOS/macOS 的 xib 或 nib 界面安全迁移为纯代码实现，并清理 Interface Builder 依赖。适用于用户要迁移或删除 xib/nib 文件、替换 loadNibNamed/UINib/nibWithNibName/registerNib 用法、把 UIKit/AppKit 的 view/controller/cell 改为代码创建，或在移除 xib 后清理 Xcode 工程引用。
 ---
 
-# XIB to Code Migration
+# XIB-to-Code Migration
 
 ## 前置流程
 

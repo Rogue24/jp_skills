@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage the saved instruction-file source for switch-instruction-files."""
+"""Manage the saved environment instruction-file source for instruction-source-switcher."""
 
 from __future__ import annotations
 
@@ -148,16 +148,16 @@ def command_clear(_: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Manage the saved instruction-file source for switch-instruction-files."
+        description="Manage the saved environment instruction-file source for instruction-source-switcher."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     for name in ("get", "show", "use"):
-        subparser = subparsers.add_parser(name, help="show and validate the saved source")
+        subparser = subparsers.add_parser(name, help="show and validate the saved environment source")
         subparser.set_defaults(func=command_get)
 
     for name in ("set", "switch"):
-        subparser = subparsers.add_parser(name, help="save a source directory")
+        subparser = subparsers.add_parser(name, help="save an environment source directory")
         subparser.add_argument("path", help="directory containing AGENTS.md, or AGENTS.md itself")
         subparser.set_defaults(func=command_set)
 
@@ -165,11 +165,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparser.add_argument("path", help="directory containing AGENTS.md, or AGENTS.md itself")
     subparser.set_defaults(func=command_temp)
 
-    subparser = subparsers.add_parser("validate", help="validate a path, or the saved source")
+    subparser = subparsers.add_parser("validate", help="validate a path, or the saved environment source")
     subparser.add_argument("path", nargs="?", help="optional source path to validate")
     subparser.set_defaults(func=command_validate)
 
-    subparser = subparsers.add_parser("clear", help="clear the saved source")
+    subparser = subparsers.add_parser("clear", help="clear the saved environment source")
     subparser.set_defaults(func=command_clear)
 
     return parser
