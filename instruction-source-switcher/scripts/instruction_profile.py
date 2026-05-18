@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage the saved environment instruction-file source for instruction-source-switcher."""
+"""Manage the saved project instruction-file source for instruction-source-switcher."""
 
 from __future__ import annotations
 
@@ -13,8 +13,10 @@ from typing import Any
 
 
 CONFIG_ENV = "AGENT_INSTRUCTION_FILES_CONFIG"
+PROJECT_ENV = "AGENT_INSTRUCTION_FILES_PROJECT"
 DEFAULT_CONFIG = Path.home() / ".codex" / "state" / "agent-instruction-files.json"
 ENTRY_FILE = "AGENTS.md"
+PROFILE_VERSION = 2
 
 
 class ProfileError(Exception):
@@ -30,6 +32,13 @@ def config_path() -> Path:
     if raw:
         return Path(raw).expanduser()
     return DEFAULT_CONFIG
+
+
+def project_root() -> Path:
+    raw = os.environ.get(PROJECT_ENV)
+    if raw:
+        return Path(raw).expanduser().resolve(strict=False)
+    return Path.cwd().resolve(strict=False)
 
 
 def normalize_source(raw_path: str) -> Path:
@@ -70,17 +79,36 @@ def load_profile() -> dict[str, Any] | None:
     return data
 
 
+def project_entry(profile: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not profile:
+        return None
+
+    projects = profile.get("projects")
+    if isinstance(projects, dict):
+        entry = projects.get(str(project_root()))
+        return entry if isinstance(entry, dict) else None
+
+    # Backward compatibility for the old single-source profile shape.
+    if isinstance(profile.get("source"), str):
+        return profile
+    return None
+
+
 def saved_source() -> Path:
     profile = load_profile()
-    if not profile:
+    entry = project_entry(profile)
+    if not entry:
         raise ProfileError(
-            "no instruction-file source is saved; ask the user for a directory containing AGENTS.md",
+            "no instruction-file source is saved for this project; ask the user for a directory containing AGENTS.md",
             exit_code=2,
         )
 
-    raw = profile.get("source")
+    raw = entry.get("source")
     if not isinstance(raw, str) or not raw.strip():
-        raise ProfileError(f"profile is missing a valid source: {config_path()}", exit_code=2)
+        raise ProfileError(
+            f"profile is missing a valid source for this project: {config_path()}",
+            exit_code=2,
+        )
     return validate_source(raw)
 
 
@@ -88,12 +116,20 @@ def write_profile(source: Path) -> None:
     path = config_path()
     path.parent.mkdir(parents=True, exist_ok=True)
 
-    data = {
-        "version": 1,
+    now = datetime.now(timezone.utc).isoformat()
+    existing = load_profile() or {}
+    projects = existing.get("projects")
+    if not isinstance(projects, dict):
+        projects = {}
+
+    root = str(project_root())
+    projects[root] = {
         "source": str(source),
         "entry_file": ENTRY_FILE,
-        "updated_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": now,
     }
+
+    data = {"version": PROFILE_VERSION, "projects": projects, "updated_at": now}
 
     temp_path = path.with_suffix(path.suffix + ".tmp")
     temp_path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
@@ -104,6 +140,7 @@ def print_result(kind: str, source: Path | None = None) -> None:
     if source is None:
         print(kind)
         return
+    print(f"project: {project_root()}")
     print(f"{kind}: {source}")
     print(f"entry: {source / ENTRY_FILE}")
 
@@ -138,7 +175,23 @@ def command_validate(args: argparse.Namespace) -> int:
 
 def command_clear(_: argparse.Namespace) -> int:
     path = config_path()
-    if path.exists():
+    profile = load_profile()
+    projects = profile.get("projects") if profile else None
+    if isinstance(projects, dict) and str(project_root()) in projects:
+        del projects[str(project_root())]
+        if projects:
+            now = datetime.now(timezone.utc).isoformat()
+            data = {"version": PROFILE_VERSION, "projects": projects, "updated_at": now}
+            temp_path = path.with_suffix(path.suffix + ".tmp")
+            temp_path.write_text(
+                json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            temp_path.replace(path)
+        else:
+            path.unlink()
+        print(f"cleared: {path}")
+    elif profile and isinstance(profile.get("source"), str):
         path.unlink()
         print(f"cleared: {path}")
     else:
@@ -148,16 +201,16 @@ def command_clear(_: argparse.Namespace) -> int:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Manage the saved environment instruction-file source for instruction-source-switcher."
+        description="Manage the saved project instruction-file source for instruction-source-switcher."
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     for name in ("get", "show", "use"):
-        subparser = subparsers.add_parser(name, help="show and validate the saved environment source")
+        subparser = subparsers.add_parser(name, help="show and validate the saved project source")
         subparser.set_defaults(func=command_get)
 
     for name in ("set", "switch"):
-        subparser = subparsers.add_parser(name, help="save an environment source directory")
+        subparser = subparsers.add_parser(name, help="save a project source directory")
         subparser.add_argument("path", help="directory containing AGENTS.md, or AGENTS.md itself")
         subparser.set_defaults(func=command_set)
 
@@ -165,11 +218,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparser.add_argument("path", help="directory containing AGENTS.md, or AGENTS.md itself")
     subparser.set_defaults(func=command_temp)
 
-    subparser = subparsers.add_parser("validate", help="validate a path, or the saved environment source")
+    subparser = subparsers.add_parser("validate", help="validate a path, or the saved project source")
     subparser.add_argument("path", nargs="?", help="optional source path to validate")
     subparser.set_defaults(func=command_validate)
 
-    subparser = subparsers.add_parser("clear", help="clear the saved environment source")
+    subparser = subparsers.add_parser("clear", help="clear the saved project source")
     subparser.set_defaults(func=command_clear)
 
     return parser
