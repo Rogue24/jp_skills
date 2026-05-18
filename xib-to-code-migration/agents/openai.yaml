@@ -1,0 +1,4 @@
+interface:
+  display_name: "XIB to Code Migration"
+  short_description: "Migrate xib/nib UI to pure code safely"
+  default_prompt: "Use $xib-to-code-migration to convert this xib-backed UI to pure code and remove the xib safely."
