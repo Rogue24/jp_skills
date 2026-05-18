@@ -1,6 +1,6 @@
 # jp_skills
 
-我自定义的一些技能（for Codex）。
+一些自定义的 Codex Skills，用于日常开发和自动化处理。
 
 ## Skills
 
