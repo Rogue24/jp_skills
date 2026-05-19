@@ -1,0 +1,4 @@
+interface:
+  display_name: "iOS->Pgyer->Lark"
+  short_description: "把已生成的 iOS 真机 .app 上传到蒲公英并通知飞书"
+  default_prompt: "使用 $ios-pgyer-lark 发布当前 iOS 项目已生成的 .app 到蒲公英，并发送飞书通知。"

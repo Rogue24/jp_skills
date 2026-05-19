@@ -26,3 +26,18 @@
 - 清理 `loadNibNamed`、`UINib`、`registerNib` 和 Xcode 工程引用。
 - 默认目标是 1:1 还原界面与行为，不重新设计。
 - 使用方式：`[$xib-to-code-migration] 把 XXX.xib 迁移成纯代码`。
+
+### iOS->Pgyer->Lark
+
+- 技能 ID：`ios-pgyer-lark`。
+- 将当前 iOS 项目已经生成好的真机 `.app` 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。
+- 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目。
+- 飞书通知默认包含最近 3 条 Git 提交标题，并会对密钥、token、webhook 和本机路径做脱敏。
+- 使用方式：`[$ios-pgyer-lark] send` 或 `[$ios-pgyer-lark] 发包`。
+- 常用命令：
+  - `status` / `检查`：检查蒲公英、飞书配置和当前能否找到可发布的 `.app`。
+  - `send --app-name Falla`：指定要查找的 App 名称。
+  - `send --app-path /path/to/Falla.app`：使用指定的已生成 `.app` 发布。
+  - `send --no-git-log`：发布但不在飞书通知里附带最近 Git 提交标题。
+  - `at "user_id_1, user_id_2"` / `unat`：管理飞书通知中的 @ 人。
+  - `clear`：清理缓存的蒲公英、飞书配置和 @ 人信息。
