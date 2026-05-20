@@ -375,6 +375,15 @@ def prompt_value(label, existing="", secret=False):
     return existing
 
 
+def read_stdin_config_value(label, secret=False):
+    print(f"等待输入 {label}，收到后会写入本机缓存。")
+    if sys.stdin.isatty():
+        value = getpass.getpass(f"{label}: " if secret else f"{label}: ")
+    else:
+        value = sys.stdin.readline()
+    return value.strip()
+
+
 def setup_config(args):
     cfg = load_config(args)
     updates = {
@@ -387,11 +396,18 @@ def setup_config(args):
         if value:
             cfg[key] = value.strip()
 
-    if sys.stdin.isatty():
+    stdin_key = getattr(args, "from_stdin", None)
+    if stdin_key:
+        value = read_stdin_config_value(CONFIG_LABELS[stdin_key], secret=stdin_key in SECRET_CONFIG_KEYS)
+        if not value:
+            raise PublishError("配置", f"{CONFIG_LABELS[stdin_key]} 不能为空")
+        cfg[stdin_key] = value
+
+    if sys.stdin.isatty() and not stdin_key:
         for key in REQUIRED_CONFIG:
             cfg[key] = prompt_value(CONFIG_LABELS[key], cfg.get(key, ""), secret=key in SECRET_CONFIG_KEYS)
 
-    if not any(updates.values()) and not sys.stdin.isatty():
+    if not any(updates.values()) and not stdin_key and not sys.stdin.isatty():
         missing = [key for key in REQUIRED_CONFIG if not cfg.get(key)]
         if missing:
             raise PublishError("配置", "非交互环境缺少配置，请用 setup 参数传入：" + ", ".join(missing))
@@ -1102,7 +1118,8 @@ def print_config_required(exc):
     print("缺少配置: " + ", ".join(exc.missing))
     next_key = exc.missing[0]
     print(f"下一项: {next_key}（{CONFIG_LABELS[next_key]}）")
-    print("请只向使用者询问这一项，收到后用 setup / 配置 缓存，再检查下一项。")
+    print(f"缓存入口: setup --from-stdin {next_key}")
+    print("请 Codex 暂停并只向使用者询问这一项，收到后用 stdin 缓存，再继续原流程。")
 
 
 def print_status(args, discover=True):
@@ -1168,6 +1185,11 @@ def build_parser():
     setup.add_argument("--feishu-webhook-url")
     setup.add_argument("--feishu-app-id")
     setup.add_argument("--feishu-app-secret")
+    setup.add_argument(
+        "--from-stdin",
+        choices=REQUIRED_CONFIG,
+        help="从 stdin 读取并缓存单个配置值，适合 Codex 等待使用者输入后继续执行",
+    )
     setup.set_defaults(func=setup_config)
 
     status = sub.add_parser("status", aliases=["检查"], parents=[common], help="查看配置和 App 发现状态")

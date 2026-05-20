@@ -36,6 +36,32 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 - `用 ios-pgyer-lark 发包`: 发布当前项目已生成的真机 `.app`。
 - `用 ios-pgyer-lark 检查`: 只检查配置和可发布产物。
 
+## 首次缺配置时的等待流程
+
+当用户执行 `[$ios-pgyer-lark] send` / `发包`，但脚本提示 `⏸️ 发布暂停，等待补齐配置` 时，Codex 要按会话等待方式处理：
+
+- 不要让使用者自己去终端运行 `setup` 命令。
+- 不要一次性索要全部配置；按脚本输出的 `下一项` 一项一项询问。
+- 询问时直接暂停当前流程，让使用者在 Codex 输入框里粘贴对应配置值。
+- 收到值后，用脚本的 stdin 缓存入口写入本机缓存，不要把真实配置值写进项目文件、技能文件或最终回复。
+- 缓存当前项后，重新执行原来的 `send` / `发包` 命令；如果还缺下一项，就继续按同样方式等待。
+- 四项配置都补齐后，继续完成原本的打包、上传和飞书通知流程。
+
+配置项对应关系：
+
+- `pgy_api_key`: 蒲公英 API Key。
+- `feishu_webhook_url`: 飞书机器人 Webhook URL。
+- `feishu_app_id`: 飞书 App ID。
+- `feishu_app_secret`: 飞书 App Secret。
+
+收到使用者输入后，Codex 用这个入口缓存单项配置：
+
+```bash
+python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --from-stdin pgy_api_key
+```
+
+上面的 `pgy_api_key` 要替换成脚本输出的 `下一项`。配置值通过 stdin 传入，不放在命令参数里。
+
 ## 脚本命令用法
 
 在项目目录下直接执行：
@@ -116,6 +142,8 @@ python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup 
 python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --feishu-app-id "飞书 App ID"
 python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --feishu-app-secret "飞书 App Secret"
 ```
+
+Codex 会优先使用上面的“首次缺配置时的等待流程”，让使用者在输入框里提供配置，然后缓存并继续原任务。下面这些 `setup --xxx` 命令主要保留给脚本手动使用。
 
 不要把真实密钥写进项目文件或技能文件。脚本会把配置缓存到：
 
