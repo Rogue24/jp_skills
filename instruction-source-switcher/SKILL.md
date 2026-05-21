@@ -22,11 +22,11 @@ This skill does not override system, developer, or current user messages. It onl
 
 Examples:
 
-- `[$instruction-source-switcher] set /Users/jp/Documents/jp_agents`: 设置并记住这个目录作为指令文件来源。
+- `[$instruction-source-switcher] set /path/to/instruction-files`: 设置并记住这个目录作为指令文件来源。
 - `[$instruction-source-switcher] use`: 使用当前项目已记住的指令文件来源，先读目标 `AGENTS.md`，再按其中说明继续工作。
 - `[$instruction-source-switcher] show`: 查看当前记住的是哪个指令文件来源。
-- `[$instruction-source-switcher] switch /Users/jp/Documents/xxx/agents`: 更换指令文件来源，并覆盖之前记住的位置。
-- `[$instruction-source-switcher] temp /Users/jp/Documents/jp_agents`: 只在本次对话临时使用这个来源，不修改已保存记忆。
+- `[$instruction-source-switcher] switch /path/to/other-instruction-files`: 更换指令文件来源，并覆盖之前记住的位置。
+- `[$instruction-source-switcher] temp /path/to/instruction-files`: 只在本次对话临时使用这个来源，不修改已保存记忆。
 - `[$instruction-source-switcher] clear`: 清除当前项目已保存的指令文件来源，恢复使用当前目录下的默认指令文件。
 
 ## Workflow
