@@ -34,6 +34,13 @@
 - 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目。
 - 飞书通知默认包含最近 3 条 Git 提交标题，并会对密钥、token、webhook 和本机路径做脱敏。
 - 使用方式：`[$ios-pgyer-lark] send` 或 `[$ios-pgyer-lark] 发包`。
+- 第一次使用如果缺配置，Codex 会暂停发布流程，并按脚本提示一项一项要求输入；缓存当前项后会继续原来的发布任务。
+- 第一次需要输入并缓存的信息：
+  - `pgy_api_key`：蒲公英 API Key。
+  - `feishu_webhook_url`：飞书机器人 Webhook URL。
+  - `feishu_app_id`：飞书 App ID。
+  - `feishu_app_secret`：飞书 App Secret。
+- 配置缓存位置：`${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json`；不要把真实密钥写进项目文件、README 或 skill 文件。
 - 常用命令：
   - `status` / `检查`：检查蒲公英、飞书配置和当前能否找到可发布的 `.app`。
   - `send --app-name Falla`：指定要查找的 App 名称。
