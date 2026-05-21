@@ -23,8 +23,8 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 - `[$ios-pgyer-lark] 发包`: 同 `send`，发布当前项目已生成的真机 `.app`。
 - `[$ios-pgyer-lark] status`: 检查蒲公英/飞书配置、飞书 @ 人，以及当前能否找到可发布的 `.app`。
 - `[$ios-pgyer-lark] 检查`: 同 `status`，只检查状态，不上传、不发通知。
-- `[$ios-pgyer-lark] send --app-name Falla`: 指定要找的 App 名称为 `Falla.app`，再执行发布。
-- `[$ios-pgyer-lark] send --app-path /path/to/Falla.app`: 使用指定的已生成 `.app` 发布，跳过自动查找。
+- `[$ios-pgyer-lark] send --app-name MyApp`: 指定要找的 App 名称为 `MyApp.app`，再执行发布。
+- `[$ios-pgyer-lark] send --app-path /path/to/MyApp.app`: 使用指定的已生成 `.app` 发布，跳过自动查找。
 - `[$ios-pgyer-lark] send --no-git-log`: 发布但不在飞书通知里附带最近 Git 提交标题。
 - `[$ios-pgyer-lark] at "user_id_1, user_id_2"`: 添加飞书 @ 人，之后发布通知会 @ 这些人。
 - `[$ios-pgyer-lark] unat "user_id_1"`: 删除指定的飞书 @ 人。
@@ -57,17 +57,23 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 收到使用者输入后，Codex 用这个入口缓存单项配置：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --from-stdin pgy_api_key
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --from-stdin pgy_api_key
 ```
 
 上面的 `pgy_api_key` 要替换成脚本输出的 `下一项`。配置值通过 stdin 传入，不放在命令参数里。
 
 ## 脚本命令用法
 
+不通过 Codex 也可以直接在终端运行脚本。下面命令里的 `<项目路径>` 换成实际的 iOS 项目根目录：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd <项目路径>
+```
+
 在项目目录下直接执行：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send --cwd "$PWD"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd "$PWD"
 ```
 
 ### 常用脚本命令
@@ -75,55 +81,55 @@ python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send -
 检查配置和可发布的 `.app`：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py status --cwd "$PWD"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" status --cwd "$PWD"
 ```
 
 发布到蒲公英并发送飞书通知：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send --cwd "$PWD"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd "$PWD"
 ```
 
-指定 App 名称，例如 `Falla.app`：
+指定 App 名称，例如 `MyApp.app`：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send --cwd "$PWD" --app-name Falla
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd "$PWD" --app-name MyApp
 ```
 
 指定已经生成好的 `.app` 路径：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send --app-path "/path/to/Falla.app"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --app-path "/path/to/MyApp.app"
 ```
 
 发布但不附带最近 Git 提交标题：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py send --cwd "$PWD" --no-git-log
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd "$PWD" --no-git-log
 ```
 
 添加飞书 @ 人：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py at "user_id_1, user_id_2"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" at "user_id_1, user_id_2"
 ```
 
 删除指定飞书 @ 人：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py unat "user_id_1"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" unat "user_id_1"
 ```
 
 删除全部飞书 @ 人：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py unat
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" unat
 ```
 
 清理缓存配置：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py clear
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" clear
 ```
 
 ## 第一次使用
@@ -131,16 +137,16 @@ python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py clear
 先检查状态：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py status --cwd "$PWD"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" status --cwd "$PWD"
 ```
 
 如果缺配置，脚本会提示缺哪一项。按顺序补：
 
 ```bash
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --pgy-api-key "蒲公英 API Key"
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --feishu-webhook-url "飞书机器人 Webhook URL"
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --feishu-app-id "飞书 App ID"
-python3 /Users/aa/.codex/skills/ios-pgyer-lark/scripts/publish_ios_app.py setup --feishu-app-secret "飞书 App Secret"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --pgy-api-key "蒲公英 API Key"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --feishu-webhook-url "飞书机器人 Webhook URL"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --feishu-app-id "飞书 App ID"
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --feishu-app-secret "飞书 App Secret"
 ```
 
 Codex 会优先使用上面的“首次缺配置时的等待流程”，让使用者在输入框里提供配置，然后缓存并继续原任务。下面这些 `setup --xxx` 命令主要保留给脚本手动使用。
