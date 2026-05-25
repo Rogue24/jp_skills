@@ -1,0 +1,4 @@
+interface:
+  display_name: "Clean Xcode Caches"
+  short_description: "安全检查并清理 Xcode 缓存"
+  default_prompt: "使用 $clean-xcode-caches 检查并安全清理 Xcode 缓存，同时保留 Archives、DeviceSupport 和模拟器设备定义。"
