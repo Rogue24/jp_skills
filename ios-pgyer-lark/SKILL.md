@@ -168,6 +168,7 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 - 生成的 IPA、二维码图片和日志都放在本次运行的受控临时目录里。
 - 成功或失败都会删除临时目录；如果删除失败，命令会报告清理失败。
 - 飞书通知默认附带最近 3 条 Git 提交标题；只发标题，并经过脱敏。使用 `--no-git-log` 可关闭。
+- 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，且其中 `BuildTime` 是非空字符串，飞书通知会在「版本号」下一行补充「构建时间」。
 - 原始 `.app`、DerivedData 产物、项目文件和缓存配置不会被发布流程删除。
 
 ## 输出结果
@@ -177,6 +178,7 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 - 是否成功
 - App 版本号
 - 构建号
+- 构建时间（当 `.app` 内存在有效 `${App名字}BuildInfo.plist` 且有 `BuildTime` 字符串时）
 - 蒲公英下载地址
 - 二维码地址
 - 关键日志或失败原因

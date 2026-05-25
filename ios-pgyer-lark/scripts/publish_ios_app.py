@@ -3,6 +3,7 @@ import argparse
 import getpass
 import json
 import os
+import plistlib
 import re
 import shutil
 import stat
@@ -784,6 +785,30 @@ def zip_path(zip_file, path, arcname):
     zip_file.write(path, arcname)
 
 
+def build_time_from_app(app_path):
+    app_path = Path(app_path)
+    plist_name = f"{app_path.stem}BuildInfo.plist"
+    root_candidate = app_path / plist_name
+    if root_candidate.is_file():
+        candidates = [root_candidate]
+    else:
+        candidates = sorted(path for path in app_path.rglob(plist_name) if path.is_file())
+    if not candidates:
+        return None
+
+    try:
+        with candidates[0].open("rb") as handle:
+            payload = plistlib.load(handle)
+    except (OSError, plistlib.InvalidFileException, ValueError, TypeError, EOFError):
+        return None
+
+    value = payload.get("BuildTime") if isinstance(payload, dict) else None
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    return value or None
+
+
 def make_ipa_from_app(app_path, run_dir, logger):
     ipa_path = run_dir / f"{app_path.stem}.ipa"
     logger.log(f"App 路径: {app_path}")
@@ -1018,7 +1043,7 @@ def git_logs(repo_root, logger=None):
     return output
 
 
-def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, include_git_log=True):
+def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, include_git_log=True, build_time=None):
     logger.log("下载二维码图片...")
     status, body = http_request(qr_url)
     if status != 200:
@@ -1035,17 +1060,20 @@ def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, inc
     build_version_no = build.get("buildBuildVersion") or ""
     shortcut = build.get("buildShortcutUrl") or ""
     title = f"{build_name} 有新版本啦~ ↑"
-    body_text = (
-        f"版本号: {build_version}({version_no}_{build_version_no})\n"
-        f"更新时间：{time.strftime('%Y-%m-%d %H:%M')}\n"
-        f"蒲公英下载地址: https://www.pgyer.com/{shortcut}\n"
-        f"蒲公英二维码地址: {qr_url}"
-    )
+    body_lines = [f"版本号: {build_version}({version_no}_{build_version_no})"]
+    if build_time:
+        body_lines.append(f"构建时间: {build_time}")
+    body_lines.extend([
+        f"发布时间: {time.strftime('%Y-%m-%d %H:%M')}",
+        f"蒲公英下载地址: https://www.pgyer.com/{shortcut}",
+        f"蒲公英二维码地址: {qr_url}",
+    ])
+    body_text = "\n".join(body_lines)
     if include_git_log:
         body_text = body_text + f"\n\n最近 Git 提交:\n{git_logs(repo_root, logger)}"
     mentions = mention_text(cfg.get("feishu_at_user_ids", []))
     if mentions:
-        body_text = body_text + "\n" + mentions
+        body_text = body_text + f"\n\n请过目\n{mentions}"
     send_feishu_payload(
         cfg,
         {"msg_type": "text", "content": {"text": f"{title}\n{body_text}"}},
@@ -1069,6 +1097,7 @@ def run_send(args):
         logger.log(f"Scheme: {artifact['scheme']}")
         logger.log(f"Configuration: {artifact['configuration']}")
         logger.log(f"产物发现方式: {artifact.get('discovery', '未知')}")
+        build_time = build_time_from_app(artifact["app_path"])
         ipa_path = make_ipa_from_app(artifact["app_path"], run_dir, logger)
         build, qr_url = upload_to_pgyer(ipa_path, cfg, logger)
         send_feishu_notification(
@@ -1079,6 +1108,7 @@ def run_send(args):
             artifact["root"],
             logger,
             include_git_log=not getattr(args, "no_git_log", False),
+            build_time=build_time,
         )
         logger.log("✅ 打包并通知完成")
     except PublishError as exc:
