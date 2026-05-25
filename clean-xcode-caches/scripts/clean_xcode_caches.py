@@ -7,6 +7,7 @@ import argparse
 import shutil
 import subprocess
 import sys
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -114,7 +115,14 @@ def remove_target(target: Target) -> None:
         return
     print(f"删除: {target.path}")
     if target.path.is_dir() and not target.path.is_symlink():
-        shutil.rmtree(target.path)
+        try:
+            shutil.rmtree(target.path)
+        except OSError as exc:
+            tmp_parent = Path(tempfile.mkdtemp(prefix="xcode-cache-cleanup-", dir="/private/tmp"))
+            tmp_path = tmp_parent / target.path.name
+            print(f"直接删除失败，改为移到临时目录后删除: {exc}")
+            target.path.rename(tmp_path)
+            shutil.rmtree(tmp_parent)
     else:
         target.path.unlink()
 
