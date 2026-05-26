@@ -43,8 +43,8 @@
     - 配置缓存位置：`${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json`；不要把真实密钥写进项目文件、README 或 skill 文件。
 - 常用命令：
   - `status` / `检查`：检查蒲公英、飞书配置和当前能否找到可发布的 `.app`。
-  - `send --app-name Falla`：指定要查找的 App 名称。
-  - `send --app-path /path/to/Falla.app`：使用指定的已生成 `.app` 发布。
+  - `send --app-name MyApp`：指定要查找的 App 名称。
+  - `send --app-path /path/to/MyApp.app`：使用指定的已生成 `.app` 发布。
   - `send --no-git-log`：发布但不在飞书通知里附带最近 Git 提交标题。
   - `at "user_id_1, user_id_2"` / `unat`：管理飞书通知中的 @ 人。
   - `clear`：清理缓存的蒲公英、飞书配置和 @ 人信息。
