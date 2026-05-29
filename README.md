@@ -31,18 +31,21 @@
 
 - 技能 ID：`ios-pgyer-lark`。
 - 将当前 iOS 项目已经生成好的真机 `.app` 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。
-- 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目。
-- 飞书通知默认包含最近 3 条 Git 提交标题，并会对密钥、token、webhook 和本机路径做脱敏。
-- 使用方式：`[$ios-pgyer-lark] send` 或 `[$ios-pgyer-lark] 发包`。
-    - 第一次使用如果缺配置，Codex 会暂停发布流程，并按脚本提示一项一项要求输入；缓存当前项后会继续原来的发布任务。
-    - 第一次需要输入并缓存的信息：
-      - `pgy_api_key`：蒲公英 API Key。
-      - `feishu_webhook_url`：飞书机器人 Webhook URL。
-      - `feishu_app_id`：飞书 App ID。
-      - `feishu_app_secret`：飞书 App Secret。
-    - 配置缓存位置：`${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json`；不要把真实密钥写进项目文件、README 或 skill 文件。
+- 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目；只有找不到已生成的 `.app` 时，才读取 Xcode Build Settings 定位产物。
+- 飞书通知默认包含最近 3 条 Git 提交标题，只发送标题，不发送作者、commit hash 或 diff，并会对密钥、token、webhook 和本机路径做脱敏。
+- 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，飞书通知和结果摘要会补充构建时间。
+- 发布前会做蒲公英和飞书相关域名的网络预检；生成的 IPA、二维码图片和日志会放在受控临时目录里，成功或失败后都会清理。
+- 使用方式：`[$ios-pgyer-lark] send` 或 `[$ios-pgyer-lark] 发包`；需要追加备注时可使用 `[$ios-pgyer-lark] send "备注1" "备注2"`。
+- 第一次使用如果缺配置，Codex 会暂停发布流程，并按脚本提示一项一项要求输入；缓存当前项后会继续原来的发布任务，原命令里的备注会保留。
+- 第一次需要输入并缓存的信息：
+  - `pgy_api_key`：蒲公英 API Key。
+  - `feishu_webhook_url`：飞书机器人 Webhook URL。
+  - `feishu_app_id`：飞书 App ID。
+  - `feishu_app_secret`：飞书 App Secret。
+- 配置缓存位置：`${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json`；不要把真实密钥写进项目文件、README 或 skill 文件。
 - 常用命令：
   - `status` / `检查`：检查蒲公英、飞书配置和当前能否找到可发布的 `.app`。
+  - `send "备注1" "备注2"` / `发包 "备注1" "备注2"`：发布并在飞书通知最下面追加备注块。
   - `send --app-name MyApp`：指定要查找的 App 名称。
   - `send --app-path /path/to/MyApp.app`：使用指定的已生成 `.app` 发布。
   - `send --no-git-log`：发布但不在飞书通知里附带最近 Git 提交标题。
