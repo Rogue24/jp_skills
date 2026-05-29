@@ -6,6 +6,7 @@ import os
 import plistlib
 import re
 import shutil
+import socket
 import stat
 import subprocess
 import sys
@@ -45,6 +46,11 @@ DERIVED_DATA_ENV_ALIASES = ["IOS_PGYER_LARK_DERIVED_DATA_DIR", "DERIVED_DATA_DIR
 RUN_DIR_PREFIX = f"{SKILL_NAME}-"
 RUN_MARKER_NAME = ".ios-pgyer-lark-run.json"
 INCLUDE_GIT_LOG_ENV = "IOS_PGYER_LARK_INCLUDE_GIT_LOG"
+PGYER_API_HOST = "api.pgyer.com"
+PGYER_WEB_HOST = "www.pgyer.com"
+FEISHU_API_HOST = "open.feishu.cn"
+REQUEST_TIMEOUT = 120
+IPA_UPLOAD_TIMEOUT = 600
 
 
 class PublishError(Exception):
@@ -346,6 +352,57 @@ def display_path(path):
 def env_truthy(name):
     value = os.environ.get(name, "").strip().lower()
     return value in {"1", "true", "yes", "y", "on"}
+
+
+def unique_hosts(hosts):
+    result = []
+    for host in hosts:
+        host = str(host or "").strip()
+        if host and host not in result:
+            result.append(host)
+    return result
+
+
+def host_from_url(value):
+    try:
+        return urllib.parse.urlparse(str(value)).hostname
+    except (TypeError, ValueError):
+        return None
+
+
+def preflight_network(cfg):
+    hosts = unique_hosts([
+        PGYER_API_HOST,
+        PGYER_WEB_HOST,
+        FEISHU_API_HOST,
+        host_from_url(cfg.get("feishu_webhook_url")),
+    ])
+    failures = []
+    for host in hosts:
+        try:
+            socket.getaddrinfo(host, None)
+        except OSError as exc:
+            failures.append(f"{host}: {exc}")
+    if failures:
+        permission_hint = ""
+        if network_socket_blocked():
+            permission_hint = "当前执行环境禁止网络 socket，请使用可联网执行权限运行 send。"
+        raise PublishError(
+            "网络预检",
+            permission_hint
+            + "以下域名无法解析，请检查当前网络、DNS、代理或 VPN 后重试："
+            + "; ".join(failures),
+        )
+
+
+def network_socket_blocked():
+    try:
+        with socket.create_connection(("1.1.1.1", 80), timeout=2):
+            return False
+    except PermissionError:
+        return True
+    except OSError as exc:
+        return getattr(exc, "errno", None) == 1
 
 
 def env_value(key):
@@ -827,16 +884,17 @@ def make_ipa_from_app(app_path, run_dir, logger):
     return ipa_path
 
 
-def http_request(url, method="GET", data=None, headers=None):
+def http_request(url, method="GET", data=None, headers=None, timeout=REQUEST_TIMEOUT):
     request = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
     try:
-        with urllib.request.urlopen(request, timeout=120) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             body = response.read()
             return response.status, body
     except urllib.error.HTTPError as exc:
         return exc.code, exc.read()
     except urllib.error.URLError as exc:
-        raise PublishError("网络请求", str(exc.reason)) from exc
+        host = host_from_url(url) or url
+        raise PublishError("网络请求", f"{host}: {exc.reason}") from exc
 
 
 def post_form(url, fields):
@@ -881,11 +939,11 @@ def multipart_body(fields, files):
     return boundary, b"".join(chunks)
 
 
-def post_multipart(url, fields, files, headers=None):
+def post_multipart(url, fields, files, headers=None, timeout=REQUEST_TIMEOUT):
     boundary, body = multipart_body(fields, files)
     merged_headers = {"Content-Type": f"multipart/form-data; boundary={boundary}"}
     merged_headers.update(headers or {})
-    return http_request(url, method="POST", data=body, headers=merged_headers)
+    return http_request(url, method="POST", data=body, headers=merged_headers, timeout=timeout)
 
 
 def parse_json(text, stage):
@@ -926,6 +984,7 @@ def upload_to_pgyer(ipa_path, cfg, logger):
             "x-cos-meta-file-name": ipa_path.name,
         },
         [("file", ipa_path, "application/octet-stream")],
+        timeout=IPA_UPLOAD_TIMEOUT,
     )
     if status != 204:
         detail = body.decode("utf-8", errors="replace")[:300]
@@ -1043,7 +1102,33 @@ def git_logs(repo_root, logger=None):
     return output
 
 
-def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, include_git_log=True, build_time=None):
+def normalized_remarks(values):
+    if values is None:
+        return []
+    if isinstance(values, (list, tuple)):
+        candidates = values
+    else:
+        candidates = [values]
+    result = []
+    for value in candidates:
+        value = str(value).strip()
+        if value:
+            result.append(value)
+    return result
+
+
+def send_feishu_notification(
+    cfg,
+    build,
+    qr_url,
+    qr_path,
+    repo_root,
+    logger,
+    include_git_log=True,
+    build_time=None,
+    remark=None,
+    remarks=None,
+):
     logger.log("下载二维码图片...")
     status, body = http_request(qr_url)
     if status != 200:
@@ -1074,6 +1159,11 @@ def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, inc
     mentions = mention_text(cfg.get("feishu_at_user_ids", []))
     if mentions:
         body_text = body_text + f"\n\n请过目\n{mentions}"
+    remark_lines = normalized_remarks(remarks)
+    if remark is not None:
+        remark_lines.extend(normalized_remarks(remark))
+    if remark_lines:
+        body_text = body_text + "\n\n备注：\n" + "\n".join(f"-> {item}" for item in remark_lines)
     send_feishu_payload(
         cfg,
         {"msg_type": "text", "content": {"text": f"{title}\n{body_text}"}},
@@ -1083,6 +1173,7 @@ def send_feishu_notification(cfg, build, qr_url, qr_path, repo_root, logger, inc
 def run_send(args):
     cleanup_stale_run_dirs()
     cfg = ensure_required_config(args)
+    preflight_network(cfg)
     run_dir = Path(tempfile.mkdtemp(prefix=RUN_DIR_PREFIX))
     write_run_marker(run_dir)
     logger = Logger(run_dir / "publish.log", [cfg.get(key) for key in REQUIRED_CONFIG])
@@ -1109,6 +1200,7 @@ def run_send(args):
             logger,
             include_git_log=not getattr(args, "no_git_log", False),
             build_time=build_time,
+            remarks=getattr(args, "remarks", []),
         )
         logger.log("✅ 打包并通知完成")
     except PublishError as exc:
@@ -1198,6 +1290,7 @@ def build_parser():
     sub = parser.add_subparsers(dest="command", required=True)
 
     send = sub.add_parser("send", aliases=["发包"], parents=[common], help="发布已发现的 iOS App")
+    send.add_argument("remarks", nargs="*", default=[], help="可选备注，可传多条，会追加到飞书通知底部；空字符串不发送")
     send.add_argument("--cwd", default=os.getcwd(), help="用于发现产物的项目目录")
     send.add_argument("--scheme", default=None, help="指定 Xcode scheme，可选")
     send.add_argument("--app-name", default=None, help="指定已生成的 .app 名称，不带 .app 后缀")

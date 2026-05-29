@@ -20,7 +20,9 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 在 Codex 里优先这样使用：
 
 - `[$ios-pgyer-lark] send`: 使用当前项目已生成的真机 `.app`，临时打 IPA，上传蒲公英，并发送飞书通知。
+- `[$ios-pgyer-lark] send "备注1" "备注2"`: 发布并在飞书通知最下面追加备注块，格式为 `备注：` 后面每条一行 `-> 备注内容`；空字符串会忽略。
 - `[$ios-pgyer-lark] 发包`: 同 `send`，发布当前项目已生成的真机 `.app`。
+- `[$ios-pgyer-lark] 发包 "备注1" "备注2"`: 同 `send "备注1" "备注2"`，发布并在飞书通知最下面追加多条备注。
 - `[$ios-pgyer-lark] status`: 检查蒲公英/飞书配置、飞书 @ 人，以及当前能否找到可发布的 `.app`。
 - `[$ios-pgyer-lark] 检查`: 同 `status`，只检查状态，不上传、不发通知。
 - `[$ios-pgyer-lark] send --app-name MyApp`: 指定要找的 App 名称为 `MyApp.app`，再执行发布。
@@ -34,6 +36,7 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 也可以直接说：
 
 - `用 ios-pgyer-lark 发包`: 发布当前项目已生成的真机 `.app`。
+- `用 iOS->Pgyer->Lark 发包 "备注1" "备注2"`: 发布当前项目已生成的真机 `.app`，并在飞书通知底部追加多条备注。
 - `用 ios-pgyer-lark 检查`: 只检查配置和可发布产物。
 
 ## 首次缺配置时的等待流程
@@ -45,6 +48,7 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 - 询问时直接暂停当前流程，让使用者在 Codex 输入框里粘贴对应配置值。
 - 收到值后，用脚本的 stdin 缓存入口写入本机缓存，不要把真实配置值写进项目文件、技能文件或最终回复。
 - 缓存当前项后，重新执行原来的 `send` / `发包` 命令；如果还缺下一项，就继续按同样方式等待。
+- 如果原来的 `send` / `发包` 后面带有备注，例如 `send "备注1" "备注2"`，补齐配置后继续执行时要保留这些备注。
 - 四项配置都补齐后，继续完成原本的打包、上传和飞书通知流程。
 
 配置项对应关系：
@@ -88,6 +92,18 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_a
 
 ```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send --cwd "$PWD"
+```
+
+发布并在飞书通知底部追加备注：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" send "备注1" "备注2" --cwd "$PWD"
+```
+
+也可以使用中文别名 `发包`：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" 发包 "备注1" "备注2" --cwd "$PWD"
 ```
 
 指定 App 名称，例如 `MyApp.app`：
@@ -163,12 +179,16 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 
 - `send` / `发包` 会先检查配置是否完整。
 - 缺配置时不要继续发布，只问用户补当前缺失项。
+- 配置完整后会先做网络预检，确认蒲公英和飞书相关域名可以解析；如果当前网络、DNS、代理或 VPN 有问题，会在生成临时 IPA 前直接失败并提示具体域名。
+- Codex 执行 `send` / `发包` 需要真实外网访问权限；如果默认执行环境提示禁止网络 socket 或全部外网域名无法解析，应使用可联网执行权限重试。
 - 优先从 `~/Library/Developer/Xcode/DerivedData/*/Build/Products/<Configuration>-iphoneos/` 找已生成的真机 `.app`。
 - 找不到 `.app` 时，才回退到 `xcodebuild -showBuildSettings` 定位产物。
 - 生成的 IPA、二维码图片和日志都放在本次运行的受控临时目录里。
+- 大 IPA 上传到蒲公英 COS 时使用更长的上传超时，避免包体较大时写入中途超时。
 - 成功或失败都会删除临时目录；如果删除失败，命令会报告清理失败。
 - 飞书通知默认附带最近 3 条 Git 提交标题；只发标题，并经过脱敏。使用 `--no-git-log` 可关闭。
 - 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，且其中 `BuildTime` 是非空字符串，飞书通知会在「版本号」下一行补充「构建时间」。
+- 如果 `send` / `发包` 后面带有非空备注参数，飞书通知会在最下面追加备注块，例如 `备注：`、`-> 备注1`、`-> 备注2`；备注只用于本次通知，不写入缓存配置或技能文件。
 - 原始 `.app`、DerivedData 产物、项目文件和缓存配置不会被发布流程删除。
 
 ## 输出结果
@@ -181,4 +201,5 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 - 构建时间（当 `.app` 内存在有效 `${App名字}BuildInfo.plist` 且有 `BuildTime` 字符串时）
 - 蒲公英下载地址
 - 二维码地址
+- 备注列表（当 `send` / `发包` 后面带有非空备注参数时）
 - 关键日志或失败原因
