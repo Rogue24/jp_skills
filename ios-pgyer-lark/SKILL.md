@@ -1,6 +1,6 @@
 ---
 name: ios-pgyer-lark
-description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。适用于用户说 send、发包、检查发布配置、配置蒲公英/飞书参数、管理飞书 @ 人、清理配置等场景。默认优先使用 DerivedData 中已有的 device .app，不主动重新编译。
+description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。适用于用户说 send、发包、检查发布配置、配置蒲公英/飞书参数、管理飞书 @ 人、配置发包者、清理配置等场景。默认优先使用 DerivedData 中已有的 device .app，不主动重新编译。
 ---
 
 # iOS 蒲公英飞书发布
@@ -28,10 +28,14 @@ description: 将当前 iOS 项目已经生成好的真机 .app 临时打成 IPA�
 - `[$ios-pgyer-lark] send --app-name MyApp`: 指定要找的 App 名称为 `MyApp.app`，再执行发布。
 - `[$ios-pgyer-lark] send --app-path /path/to/MyApp.app`: 使用指定的已生成 `.app` 发布，跳过自动查找。
 - `[$ios-pgyer-lark] send --no-git-log`: 发布但不在飞书通知里附带最近 Git 提交标题。
+- `[$ios-pgyer-lark] setup --codesign-identity-hash 40位SHA1`: 设置或更新本机 codesign 签名证书 SHA-1 指纹；这是可选后续配置，不属于首次必填。
+- `[$ios-pgyer-lark] setup --feishu-sender-user-id "user_id"`: 设置或更新发包者飞书 user_id；发布通知会在「蒲公英二维码地址」下一行显示「发包者：@xxx」，这是可选后续配置，不属于首次必填。
 - `[$ios-pgyer-lark] at "user_id_1, user_id_2"`: 添加飞书 @ 人，之后发布通知会 @ 这些人。
 - `[$ios-pgyer-lark] unat "user_id_1"`: 删除指定的飞书 @ 人。
 - `[$ios-pgyer-lark] unat`: 删除全部飞书 @ 人。
-- `[$ios-pgyer-lark] clear`: 清理缓存的蒲公英/飞书配置和 @ 人信息。
+- `[$ios-pgyer-lark] clear --codesign-identity-hash`: 只清理本机 codesign 签名证书 SHA-1 指纹，不影响蒲公英/飞书配置和 @ 人。
+- `[$ios-pgyer-lark] clear --feishu-sender-user-id`: 只清理发包者飞书 user_id，不影响蒲公英/飞书配置、@ 人和签名证书指纹。
+- `[$ios-pgyer-lark] clear`: 清理全部缓存配置，包括蒲公英/飞书配置、@ 人、`codesign_identity_hash` 和 `feishu_sender_user_id`。
 
 也可以直接说：
 
@@ -142,7 +146,31 @@ python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_a
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" unat
 ```
 
-清理缓存配置：
+设置或更新本机 codesign 签名证书 SHA-1 指纹：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --codesign-identity-hash "40位SHA1"
+```
+
+设置或更新发包者飞书 user_id：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" setup --feishu-sender-user-id "user_id"
+```
+
+只清理本机 codesign 签名证书 SHA-1 指纹：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" clear --codesign-identity-hash
+```
+
+只清理发包者飞书 user_id：
+
+```bash
+python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" clear --feishu-sender-user-id
+```
+
+清理全部缓存配置：
 
 ```bash
 python3 "${CODEX_HOME:-$HOME/.codex}/skills/ios-pgyer-lark/scripts/publish_ios_app.py" clear
@@ -175,6 +203,8 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 
 缓存目录会收紧到 `700` 权限，配置文件会收紧到 `600` 权限。`status`、失败日志和普通输出只显示脱敏后的配置，不打印完整密钥、webhook 或飞书 user_id。
 
+`codesign_identity_hash`、`feishu_sender_user_id` 和飞书 @ 人一样是可选后续配置，不属于第一次使用的必填项。只有当 `.app` 完整性校验失败、需要重签时才会使用 `codesign_identity_hash`。
+
 ## 发布规则
 
 - `send` / `发包` 会先检查配置是否完整。
@@ -184,10 +214,14 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 - 优先从 `~/Library/Developer/Xcode/DerivedData/*/Build/Products/<Configuration>-iphoneos/` 找已生成的真机 `.app`。
 - 找不到 `.app` 时，才回退到 `xcodebuild -showBuildSettings` 定位产物。
 - 生成的 IPA、二维码图片和日志都放在本次运行的受控临时目录里。
+- 生成 IPA 前会对原 `.app` 执行完整性校验；如果无法验证其完整性，会读取本机 `codesign_identity_hash`，使用反推出的 `.app.xcent` 对原 `.app` 原地重签。
+- 原地重签会修改 DerivedData 或指定路径中的原 `.app`；重签成功或失败都会在输出中明确提及。
+- 如果缺少 `codesign_identity_hash`、找不到 `.app.xcent`、重签失败，或重签后二次校验仍失败，发布会直接停止，不上传蒲公英、不发飞书。
 - 大 IPA 上传到蒲公英 COS 时使用更长的上传超时，避免包体较大时写入中途超时。
 - 成功或失败都会删除临时目录；如果删除失败，命令会报告清理失败。
 - 飞书通知默认附带最近 3 条 Git 提交标题；只发标题，并经过脱敏。使用 `--no-git-log` 可关闭。
 - 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，且其中 `BuildTime` 是非空字符串，飞书通知会在「版本号」下一行补充「构建时间」。
+- 如果配置了 `feishu_sender_user_id`，飞书通知会在「蒲公英二维码地址」下一行补充「发包者：@xxx」，其中 @ 显示由飞书根据该 user_id 解析。
 - 如果 `send` / `发包` 后面带有非空备注参数，飞书通知会在最下面追加备注块，例如 `备注：`、`-> 备注1`、`-> 备注2`；备注只用于本次通知，不写入缓存配置或技能文件。
 - 原始 `.app`、DerivedData 产物、项目文件和缓存配置不会被发布流程删除。
 
@@ -201,5 +235,7 @@ ${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json
 - 构建时间（当 `.app` 内存在有效 `${App名字}BuildInfo.plist` 且有 `BuildTime` 字符串时）
 - 蒲公英下载地址
 - 二维码地址
+- 发包者（当配置了 `feishu_sender_user_id` 时）
 - 备注列表（当 `send` / `发包` 后面带有非空备注参数时）
+- `.app` 完整性校验结果，以及是否已对原 `.app` 进行重签
 - 关键日志或失败原因

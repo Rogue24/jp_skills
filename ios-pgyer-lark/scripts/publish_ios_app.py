@@ -33,6 +33,10 @@ CONFIG_LABELS = {
     "feishu_app_id": "飞书 App ID",
     "feishu_app_secret": "飞书 App Secret",
 }
+OPTIONAL_CONFIG_LABELS = {
+    "codesign_identity_hash": "CodeSign Identity SHA-1",
+    "feishu_sender_user_id": "发包者飞书 user_id",
+}
 SECRET_CONFIG_KEYS = {"pgy_api_key", "feishu_app_secret"}
 ENV_ALIASES = {
     "pgy_api_key": ["IOS_PGYER_LARK_PGY_API_KEY", "PGY_API_KEY"],
@@ -51,6 +55,7 @@ PGYER_WEB_HOST = "www.pgyer.com"
 FEISHU_API_HOST = "open.feishu.cn"
 REQUEST_TIMEOUT = 120
 IPA_UPLOAD_TIMEOUT = 600
+CODESIGN_IDENTITY_HASH_RE = re.compile(r"^[A-Fa-f0-9]{40}$")
 
 
 class PublishError(Exception):
@@ -298,6 +303,11 @@ def load_config(args):
         raise PublishError("读取配置", "配置文件格式不是 JSON 对象")
     if not isinstance(data.get("feishu_at_user_ids"), list):
         data["feishu_at_user_ids"] = []
+    sender_user_id = normalize_optional_user_id(data.get("feishu_sender_user_id"))
+    if sender_user_id:
+        data["feishu_sender_user_id"] = sender_user_id
+    else:
+        data.pop("feishu_sender_user_id", None)
     return data
 
 
@@ -307,6 +317,11 @@ def save_config(args, data):
     ensure_config_dir(path.parent)
     cleaned = dict(data)
     cleaned["feishu_at_user_ids"] = unique_ids(cleaned.get("feishu_at_user_ids", []))
+    sender_user_id = normalize_optional_user_id(cleaned.get("feishu_sender_user_id"))
+    if sender_user_id:
+        cleaned["feishu_sender_user_id"] = sender_user_id
+    else:
+        cleaned.pop("feishu_sender_user_id", None)
     tmp_path = path.with_suffix(".tmp")
     with tmp_path.open("w", encoding="utf-8") as handle:
         json.dump(cleaned, handle, ensure_ascii=False, indent=2)
@@ -321,6 +336,24 @@ def save_config(args, data):
 
 def clear_config(args):
     path = config_path(args)
+    if getattr(args, "feishu_sender_user_id", False):
+        cfg = load_config(args)
+        if "feishu_sender_user_id" in cfg:
+            cfg.pop("feishu_sender_user_id", None)
+            save_config(args, cfg)
+            print("已清理 feishu_sender_user_id")
+        else:
+            print("feishu_sender_user_id 未配置，无需清理")
+        return
+    if getattr(args, "codesign_identity_hash", False):
+        cfg = load_config(args)
+        if "codesign_identity_hash" in cfg:
+            cfg.pop("codesign_identity_hash", None)
+            save_config(args, cfg)
+            print("已清理 codesign_identity_hash")
+        else:
+            print("codesign_identity_hash 未配置，无需清理")
+        return
     if path.exists():
         path.unlink()
         print(f"已清理配置: {display_path(path)}")
@@ -339,6 +372,19 @@ def mask(value):
 
 def mask_list(values):
     return [mask(value) for value in unique_ids(values)]
+
+
+def normalize_optional_user_id(value):
+    return str(value or "").strip().strip('"').strip("'")
+
+
+def normalize_codesign_identity_hash(value):
+    cleaned = str(value or "").strip().replace(" ", "").upper()
+    if not cleaned:
+        return ""
+    if not CODESIGN_IDENTITY_HASH_RE.fullmatch(cleaned):
+        raise PublishError("配置", "codesign_identity_hash 必须是 40 位十六进制 SHA-1 指纹")
+    return cleaned
 
 
 def display_path(path):
@@ -449,10 +495,17 @@ def setup_config(args):
         "feishu_webhook_url": getattr(args, "feishu_webhook_url", None),
         "feishu_app_id": getattr(args, "feishu_app_id", None),
         "feishu_app_secret": getattr(args, "feishu_app_secret", None),
+        "codesign_identity_hash": getattr(args, "codesign_identity_hash", None),
+        "feishu_sender_user_id": getattr(args, "feishu_sender_user_id", None),
     }
     for key, value in updates.items():
         if value:
-            cfg[key] = value.strip()
+            if key == "codesign_identity_hash":
+                cfg[key] = normalize_codesign_identity_hash(value)
+            elif key == "feishu_sender_user_id":
+                cfg[key] = normalize_optional_user_id(value)
+            else:
+                cfg[key] = value.strip()
 
     stdin_key = getattr(args, "from_stdin", None)
     if stdin_key:
@@ -832,6 +885,112 @@ def discover_app(args):
     return discover_app_from_build_settings(args, root, container)
 
 
+def command_result(command, stage, cwd=None):
+    try:
+        return subprocess.run(
+            [str(item) for item in command],
+            cwd=str(cwd) if cwd else None,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError as exc:
+        raise PublishError(stage, f"{command[0]} 无法执行：{exc}") from exc
+
+
+def command_detail(result, limit=1200):
+    detail = "\n".join(
+        line.strip()
+        for line in (result.stderr + "\n" + result.stdout).splitlines()
+        if line.strip()
+    )
+    return detail[-limit:] if detail else f"退出码 {result.returncode}"
+
+
+def verify_app_integrity(app_path):
+    result = command_result(
+        ["codesign", "--verify", "--deep", "--strict", "--verbose=4", str(app_path)],
+        "App 完整性校验",
+    )
+    if result.returncode == 0:
+        return True, ""
+    return False, command_detail(result)
+
+
+def xcent_path_from_app(app_path):
+    app_path = Path(app_path)
+    parts = app_path.parts
+    try:
+        build_index = parts.index("Build")
+    except ValueError:
+        raise PublishError("App 完整性校验", f"无法从 App 路径反推 xcent，路径缺少 Build 目录：{app_path}")
+    if len(parts) < build_index + 4 or parts[build_index + 1] != "Products":
+        raise PublishError("App 完整性校验", f"无法从 App 路径反推 xcent，路径不是 Build/Products 产物：{app_path}")
+    configuration = app_path.parent.name
+    app_name = app_path.stem
+    derived_root = Path(*parts[:build_index]) if build_index else Path("/")
+    return (
+        derived_root
+        / "Build"
+        / "Intermediates.noindex"
+        / f"{app_name}.build"
+        / configuration
+        / f"{app_name}.build"
+        / f"{app_name}.app.xcent"
+    )
+
+
+def codesign_identity_hash_from_config(cfg):
+    value = normalize_codesign_identity_hash(cfg.get("codesign_identity_hash"))
+    if not value:
+        raise PublishError(
+            "App 完整性校验",
+            "App 无法验证其完整性，且未配置 codesign_identity_hash。请先执行 setup --codesign-identity-hash <40位SHA1> 后重试。",
+        )
+    return value
+
+
+def resign_original_app(app_path, cfg, logger):
+    identity_hash = codesign_identity_hash_from_config(cfg)
+    logger.add_secret(identity_hash)
+    xcent_path = xcent_path_from_app(app_path)
+    if not xcent_path.exists():
+        raise PublishError("App 完整性校验", f"App 无法验证其完整性，且未找到重签所需 xcent 文件：{xcent_path}")
+    logger.log(f"开始对原 .app 进行重签，签名身份: {mask(identity_hash)}")
+    logger.log(f"重签 xcent: {xcent_path}")
+    result = command_result(
+        [
+            "/usr/bin/codesign",
+            "--force",
+            "--sign",
+            identity_hash,
+            "--entitlements",
+            str(xcent_path),
+            "--timestamp=none",
+            "--generate-entitlement-der",
+            str(app_path),
+        ],
+        "App 重签",
+    )
+    if result.returncode != 0:
+        raise PublishError("App 完整性校验", f"App 无法验证其完整性，重签失败：{command_detail(result)}")
+    logger.log("已对原 .app 进行了重签")
+
+
+def ensure_app_integrity_before_ipa(app_path, cfg, logger):
+    ok, detail = verify_app_integrity(app_path)
+    if ok:
+        logger.log(".app 完整性校验通过，未重签")
+        return False
+    logger.log(f".app 完整性校验未通过，准备对原 .app 重签: {detail}")
+    resign_original_app(app_path, cfg, logger)
+    ok, resign_detail = verify_app_integrity(app_path)
+    if not ok:
+        raise PublishError("App 完整性校验", f"已对原 .app 进行了重签，但仍无法验证其完整性：{resign_detail}")
+    logger.log("重签后二次完整性校验通过")
+    return True
+
+
 def zip_path(zip_file, path, arcname):
     if path.is_symlink():
         info = zipfile.ZipInfo(str(arcname))
@@ -1153,6 +1312,9 @@ def send_feishu_notification(
         f"蒲公英下载地址: https://www.pgyer.com/{shortcut}",
         f"蒲公英二维码地址: {qr_url}",
     ])
+    sender_mention = mention_text([cfg.get("feishu_sender_user_id")])
+    if sender_mention:
+        body_lines.append(f"发包者：{sender_mention}")
     body_text = "\n".join(body_lines)
     if include_git_log:
         body_text = body_text + f"\n\n最近 Git 提交:\n{git_logs(repo_root, logger)}"
@@ -1179,6 +1341,7 @@ def run_send(args):
     logger = Logger(run_dir / "publish.log", [cfg.get(key) for key in REQUIRED_CONFIG])
     publish_error = None
     cleanup_error = None
+    app_resigned = False
     try:
         start = time.monotonic()
         artifact = discover_app(args)
@@ -1189,6 +1352,7 @@ def run_send(args):
         logger.log(f"Configuration: {artifact['configuration']}")
         logger.log(f"产物发现方式: {artifact.get('discovery', '未知')}")
         build_time = build_time_from_app(artifact["app_path"])
+        app_resigned = ensure_app_integrity_before_ipa(artifact["app_path"], cfg, logger)
         ipa_path = make_ipa_from_app(artifact["app_path"], run_dir, logger)
         build, qr_url = upload_to_pgyer(ipa_path, cfg, logger)
         send_feishu_notification(
@@ -1204,6 +1368,8 @@ def run_send(args):
         )
         logger.log("✅ 打包并通知完成")
     except PublishError as exc:
+        if app_resigned:
+            logger.log_memory("提示: 已对原 .app 进行了重签")
         publish_error = exc
     finally:
         try:
@@ -1249,6 +1415,8 @@ def print_status(args, discover=True):
     print(f"配置文件: {display_path(config_path(args))}")
     for key in REQUIRED_CONFIG:
         print(f"{key}: {mask(cfg.get(key))}")
+    print(f"codesign_identity_hash: {mask(cfg.get('codesign_identity_hash'))}")
+    print(f"feishu_sender_user_id: {mask(cfg.get('feishu_sender_user_id'))}")
     ids = unique_ids(cfg.get("feishu_at_user_ids", []))
     print("feishu_at_user_ids: " + (", ".join(mask_list(ids)) if ids else "无"))
     if discover:
@@ -1308,6 +1476,8 @@ def build_parser():
     setup.add_argument("--feishu-webhook-url")
     setup.add_argument("--feishu-app-id")
     setup.add_argument("--feishu-app-secret")
+    setup.add_argument("--codesign-identity-hash", help="缓存本机 codesign 签名证书 SHA-1 指纹，可选配置")
+    setup.add_argument("--feishu-sender-user-id", help="缓存发包者飞书 user_id，可选配置")
     setup.add_argument(
         "--from-stdin",
         choices=REQUIRED_CONFIG,
@@ -1328,6 +1498,8 @@ def build_parser():
     status.set_defaults(func=lambda args: print_status(args, discover=True))
 
     clear = sub.add_parser("clear", aliases=["清理"], parents=[common], help="清理缓存配置")
+    clear.add_argument("--codesign-identity-hash", action="store_true", help="只清理本机 codesign 签名证书 SHA-1 指纹")
+    clear.add_argument("--feishu-sender-user-id", action="store_true", help="只清理发包者飞书 user_id")
     clear.set_defaults(func=clear_config)
 
     at_cmd = sub.add_parser("at", aliases=["@人"], parents=[common], help="添加飞书 user_id，用于发布通知时 @ 人")

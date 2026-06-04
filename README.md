@@ -34,7 +34,9 @@
 - 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目；只有找不到已生成的 `.app` 时，才读取 Xcode Build Settings 定位产物。
 - 飞书通知默认包含最近 3 条 Git 提交标题，只发送标题，不发送作者、commit hash 或 diff，并会对密钥、token、webhook 和本机路径做脱敏。
 - 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，飞书通知和结果摘要会补充构建时间。
+- 如果配置了 `feishu_sender_user_id`，飞书通知和结果摘要会补充发包者。
 - 发布前会做蒲公英和飞书相关域名的网络预检；生成的 IPA、二维码图片和日志会放在受控临时目录里，成功或失败后都会清理。
+- 生成 IPA 前会校验原 `.app` 完整性；校验失败且已配置 `codesign_identity_hash` 时，会使用 `.app.xcent` 对原 `.app` 原地重签；缺配置或重签失败会停止发布。
 - 使用方式：`[$ios-pgyer-lark] send` 或 `[$ios-pgyer-lark] 发包`；需要追加备注时可使用 `[$ios-pgyer-lark] send "备注1" "备注2"`。
 - 第一次使用如果缺配置，Codex 会暂停发布流程，并按脚本提示一项一项要求输入；缓存当前项后会继续原来的发布任务，原命令里的备注会保留。
 - 第一次需要输入并缓存的信息：
@@ -42,6 +44,9 @@
   - `feishu_webhook_url`：飞书机器人 Webhook URL。
   - `feishu_app_id`：飞书 App ID。
   - `feishu_app_secret`：飞书 App Secret。
+- 可选后续配置：
+  - `codesign_identity_hash`：本机 codesign 签名证书 SHA-1 指纹，只在 `.app` 完整性校验失败、需要重签时使用。
+  - `feishu_sender_user_id`：发包者飞书 user_id，发布通知会显示「发包者：@xxx」。
 - 配置缓存位置：`${CODEX_HOME:-~/.codex}/skill-data/ios-pgyer-lark/config.json`；不要把真实密钥写进项目文件、README 或 skill 文件。
 - 常用命令：
   - `status` / `检查`：检查蒲公英、飞书配置和当前能否找到可发布的 `.app`。
@@ -49,8 +54,11 @@
   - `send --app-name MyApp`：指定要查找的 App 名称。
   - `send --app-path /path/to/MyApp.app`：使用指定的已生成 `.app` 发布。
   - `send --no-git-log`：发布但不在飞书通知里附带最近 Git 提交标题。
+  - `setup --codesign-identity-hash 40位SHA1`：设置或更新本机 codesign 签名证书 SHA-1 指纹。
+  - `setup --feishu-sender-user-id "user_id"`：设置或更新发包者飞书 user_id。
   - `at "user_id_1, user_id_2"` / `unat`：管理飞书通知中的 @ 人。
-  - `clear`：清理缓存的蒲公英、飞书配置和 @ 人信息。
+  - `clear --codesign-identity-hash` / `clear --feishu-sender-user-id`：只清理指定可选配置。
+  - `clear`：清理全部缓存配置，包括蒲公英、飞书、@ 人、签名证书指纹和发包者信息。
 
 ### Clean Xcode Caches
 
