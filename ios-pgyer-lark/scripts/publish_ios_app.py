@@ -567,6 +567,8 @@ def unique_ids(items):
     result = []
     seen = set()
     for item in items or []:
+        if item is None:
+            continue
         value = str(item).strip()
         if value and value not in seen:
             result.append(value)
@@ -1312,7 +1314,8 @@ def send_feishu_notification(
         f"蒲公英下载地址: https://www.pgyer.com/{shortcut}",
         f"蒲公英二维码地址: {qr_url}",
     ])
-    sender_mention = mention_text([cfg.get("feishu_sender_user_id")])
+    sender_user_id = normalize_optional_user_id(cfg.get("feishu_sender_user_id"))
+    sender_mention = mention_text([sender_user_id])
     if sender_mention:
         body_lines.append(f"发包者：{sender_mention}")
     body_text = "\n".join(body_lines)
