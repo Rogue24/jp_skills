@@ -53,5 +53,5 @@ description: 将 iOS/macOS 的 xib 或 nib 界面安全迁移为纯代码实现�
 - Search for residual xib names and nib APIs in the target scope and project file.
 - Run `plutil -lint` on `project.pbxproj` when it changed.
 - Run scoped `git diff --check` on touched paths.
-- Build or test with the repo's preferred Xcode workflow when feasible.
+- After static validation, stop by default. If you think a full build or test is necessary, ask the user first, explain why it is needed, and run it only after confirmation.
 - Report any full-worktree check failures caused by unrelated files separately.
