@@ -22,6 +22,8 @@ description: 将 iOS/macOS 的 xib 或 nib 界面安全迁移为纯代码实现�
    - Recreate the view hierarchy, constraints, colors, fonts, images, content modes, visibility, alpha, corner radius, borders, and event wiring.
    - Convert `IBOutlet` to normal stored properties and `IBAction` to explicit target/action or equivalent code hooks.
    - Preserve the module's existing language and layout style, such as Objective-C + Masonry or Swift + SnapKit.
+   - When Masonry or SnapKit is available, use it for translated constraints and avoid raw `NSLayoutAnchor` or `NSLayoutConstraint activateConstraints:` code. Use native Auto Layout only when the layout library cannot express the required behavior, and document why.
+   - For runtime constraint changes, retain `MASConstraint` and call `setOffset:` in Objective-C, or retain SnapKit `Constraint` and call `update(offset:)` in Swift; runtime updates are not a reason to fall back to native Auto Layout.
    - Preserve safe area semantics. If the xib constrained to safe area, add a short comment near the translated constraint.
 
 3. **Pass 2: calibrate against old runtime logic**
