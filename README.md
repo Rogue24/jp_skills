@@ -32,7 +32,7 @@
 - 技能 ID：`ios-pgyer-lark`。
 - 将当前 iOS 项目已经生成好的真机 `.app` 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。
 - 默认优先使用 DerivedData 中已有的 device `.app`，不会主动重新编译项目；只有找不到已生成的 `.app` 时，才读取 Xcode Build Settings 定位产物。
-- 飞书通知默认包含最近 3 条 Git 提交标题，只发送标题，不发送作者、commit hash 或 diff，并会对密钥、token、webhook 和本机路径做脱敏。
+- 飞书通知会显示当前 Git 分支，并默认包含最近 3 条 Git 提交标题；只发送标题，不发送作者、commit hash 或 diff，并会对密钥、token、webhook 和本机路径做脱敏。
 - 如果 `.app` 内存在有效的 `${App名字}BuildInfo.plist`，飞书通知和结果摘要会补充构建时间。
 - 如果配置了 `feishu_sender_user_id`，飞书通知和结果摘要会补充发包者。
 - 发布前会做蒲公英和飞书相关域名的网络预检；生成的 IPA、二维码图片和日志会放在受控临时目录里，成功或失败后都会清理。

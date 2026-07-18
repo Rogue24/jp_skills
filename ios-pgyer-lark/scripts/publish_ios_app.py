@@ -1263,6 +1263,23 @@ def git_logs(repo_root, logger=None):
     return output
 
 
+def git_branch(repo_root, logger=None):
+    try:
+        result = subprocess.run(
+            ["git", "branch", "--show-current"],
+            cwd=str(repo_root),
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return "未获取到 git 分支"
+    output = result.stdout.strip() or "未获取到 git 分支"
+    if logger:
+        return logger.redact(output)
+    return output
+
+
 def normalized_remarks(values):
     if values is None:
         return []
@@ -1307,6 +1324,7 @@ def send_feishu_notification(
     shortcut = build.get("buildShortcutUrl") or ""
     title = f"{build_name} 有新版本啦~ ↑"
     body_lines = [f"版本号: {build_version}({version_no}_{build_version_no})"]
+    body_lines.append(f"当前分支: {git_branch(repo_root, logger)}")
     if build_time:
         body_lines.append(f"构建时间: {build_time}")
     body_lines.extend([
