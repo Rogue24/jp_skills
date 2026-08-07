@@ -1,10 +1,12 @@
 # jp_skills
 
-一些自定义的 Codex Skills，用于日常开发和自动化处理。
+一些自定义的 Codex Skills，覆盖日常开发、构建发布、工程清理与文档整理等场景。
 
 ## Skills
 
-### Instruction Source Switcher
+### 日常开发
+
+#### Instruction Source Switcher
 
 - 技能 ID：`instruction-source-switcher`。
 - 切换并记住当前项目使用的指令文件来源。
@@ -19,7 +21,7 @@
   - `temp /path/to/instructions`：仅本次临时使用这个来源，不修改已保存配置。
   - `clear`：清除当前项目已保存的来源，恢复使用当前目录下的默认指令文件。
 
-### XIB-to-Code Migration
+#### XIB-to-Code Migration
 
 - 技能 ID：`xib-to-code-migration`。
 - 将 iOS/macOS 的 `.xib` 或 `.nib` 界面迁移为纯代码实现。
@@ -27,7 +29,9 @@
 - 默认目标是 1:1 还原界面与行为，不重新设计。
 - 使用方式：`[$xib-to-code-migration] 把 XXX.xib 迁移成纯代码`。
 
-### iOS->Pgyer->Lark
+### 构建发布
+
+#### iOS->Pgyer->Lark
 
 - 技能 ID：`ios-pgyer-lark`。
 - 将当前 iOS 项目已经生成好的真机 `.app` 临时打成 IPA，上传到蒲公英，并发送飞书机器人通知。
@@ -60,7 +64,9 @@
   - `clear --codesign-identity-hash` / `clear --feishu-sender-user-id`：只清理指定可选配置。
   - `clear`：清理全部缓存配置，包括蒲公英、飞书、@ 人、签名证书指纹和发包者信息。
 
-### Clean Xcode Caches
+### 工程清理
+
+#### Clean Xcode Caches
 
 - 技能 ID：`clean-xcode-caches`。
 - 检查并安全清理本机 Xcode 占用空间。
@@ -68,3 +74,14 @@
 - 始终保留 Xcode Archives、iOS DeviceSupport、模拟器设备定义、runtime、描述文件、代码片段、快捷键和其他个人 Xcode 设置。
 - 清空模拟器 App 和数据时使用 `xcrun simctl erase all`，不手动删除 `CoreSimulator/Devices`。
 - 使用方式：引用一下`[$clean-xcode-caches]`就行。
+
+### 文档整理
+
+#### Export Conversation to Markdown
+
+- 技能 ID：`export-conversation-md`。
+- 将当前对话总结并导出为一份规范的中文 Markdown 技术文档。
+- 只保留有价值的技术讨论、结论、代码分析、方案对比与踩坑解决,自动剔除关于导出、生成技能、闲聊等元对话。
+- 产出带引言区、目录锚点、分章节、Markdown 表格、带语言标注的代码块,并以 `## 总体结论` 收尾。
+- 直接用 Write 手写生成 `.md`,不调用 `/export` 命令;默认写到项目根目录,文件名用能体现主题的中文短语。
+- 使用方式:说"导出对话""把讨论整理成文档""总结当前对话生成文档"等,或 `[$export-conversation-md]`。
