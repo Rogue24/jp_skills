@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fresh Chat Handoff"
+  short_description: "上下文偏满时先询问，经确认后用交接摘要开启全新独立对话，不创建分支"
+  default_prompt: "使用 $fresh-chat-handoff，把当前对话整理为交接摘要，并创建一个全新的独立对话继续，不要创建分支。"
